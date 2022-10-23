@@ -10,7 +10,6 @@ buyTimingAO <- function(x,hyperPars=c(short,long)){
   py_run_file("D:/Quant/Rcode/Indicators/AO(Awesome Oscillator)/AO_py.py")
   stg <- x[,{
     AO <- py$ao
-    cat(AO)
     buySig <- ifelse((AO>0 & (AO-shift(AO,1))>0 & shift(AO,1)>0 & (shift(AO,1)-shift(AO,2))<0)|
                        (AO>0 & shift(AO,1)<0)|
                        (AO<0 & (shift(AO,1)-AO)<0 & shift(AO,2)<0 & (shift(AO,2)-shift(AO,1))>0 & (shift(AO,3)-shift(AO,2))<0),1,0)
@@ -23,6 +22,7 @@ buyTimingAO <- function(x,hyperPars=c(short,long)){
   }] 
   return(stg)
 }
+#stg2 <- buyTimingAO(pr,c(5,34))
 evaluateppv <- function(stgy){
   loc<-(which(stgy[,'buySig']==1))
   stgyb<-stgy[loc,]
@@ -57,13 +57,12 @@ Search <-function(lowerHyper=c(hyper1,hyper2,hyper3),upperHyper=c(hyper1,hyper2,
   
   return(Best)    #输出最优参数组合
 }
-Search(lowerHyper = c(10,2,25),upperHyper = c(15,10,35))
+#Search(lowerHyper = c(10,2,25),upperHyper = c(15,10,35))
 
-n <- seq(10,15,by=1)
-pow1 <- seq(2,5,by=1)
-pow2 <- seq(30,35,by=1)
-holdTime <- seq(1,5,by=1)
-parSpace <- expand_grid(n,pow1,pow2,holdTime) %>% data.table
+short <- seq(5,15,by=1)
+long <- seq(30,90,by=1)
+
+parSpace <- expand_grid(short,long) %>% data.table
 hyperParSpace <- parSpace
 S=10L  #分十组
 
@@ -71,16 +70,16 @@ fgs <- combn(S,floor(S/2),simplify = F) # 模型训练集的分R data.table组�
 fulldata <- pr %>% mutate(group=cut(1:nrow(pr),S) %>% as.integer()) #在标记买卖信号的全数据上加上组标签
 
 X <- hyperParSpace[,{
-  cat(' n=',n,' pow1=',pow1,' pow2=',pow2,'holdTime=',holdTime,'\n')
-  stg <-buyTimingKAMA(x=pr,
-                      hyperPars=c(n=n,pow1=pow1,pow2=pow2,holdTime=holdTime)) #首先在全数据上生成买入卖出信号
+  cat(' short=',short,' long=',long,'\n')
+  stg <-buyTimingAO(x=pr,
+                      hyperPars=c(short=short,long=long)) #首先在全数据上生成买入卖出信号
   fulldata <- stg %>% mutate(group=cut(1:nrow(pr),S) %>% as.integer()) #在标记买卖信号的全数据上加上组标签
   J.tubes <-fgs %>% map(~fulldata[group %in% .,]) # 生成含有所有训练集组合的列表
   Jc.tubes <- J.tubes %>% map(~ setdiff(fulldata,.)) #用差集的方式生成含有所有验证集组合的列表
   ppv.J <- map_dbl(J.tubes,~evaluateppv(.))
   ppv.Jc <- map_dbl(Jc.tubes,~evaluateppv(.))
   list(N=1:length(J.tubes),ppv.J=ppv.J,ppv.Jc=ppv.Jc)#不同N代表不同的训练集选择
-},by=.(n,pow1,pow2,holdTime)] # 针对每一个超参组合，计算全部训练集J和对应的全部验证集Jc上的ppv结果
+},by=.(short,long)] # 针对每一个超参组合，计算全部训练集J和对应的全部验证集Jc上的ppv结果
 
 #write.csv(X,"outcome.csv") #将训练结果写入csv文件
 
@@ -91,7 +90,8 @@ Ld <- X[,{
   w <- ifelse(w==1,0.999,ifelse(w==0,0.001,w))
   lambda <- log(w/(1-w))
   list(lambda=lambda)         
-},by=.(n,pow1,pow2,holdTime)]
+},by=.(short,long)]
 #write.csv(Ld,"Rank.csv") #将排名结果写入csv文件
+
 Fn.cdf <- Ld$lambda %>% ecdf #构建lambda的经验分布函数
 PBO <- Fn.cdf(0) # 根据经验分布函数，得到过拟合概率
