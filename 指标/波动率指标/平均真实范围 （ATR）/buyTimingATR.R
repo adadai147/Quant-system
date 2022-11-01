@@ -24,8 +24,8 @@ Weekday <- c("星期一","星期二","星期三","星期四","星期五")
 #超参：n
 #=====================ATR(Average True Range)====================
 
-py$period=10
-py_run_file("C:/量化投资/2022.10-11/Average True Range (ATR)/ATR_py.py")
+#py$period=10
+#py_run_file("C:/量化投资/2022.10-11/Average True Range (ATR)/ATR_py.py")
 
 buyTimingATR <- function(x,hyperPars=c(n)){
   py$period=hyperPars[1]
